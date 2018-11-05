@@ -1,0 +1,255 @@
+---
+title: "DRAFT Raster Interpolation Blog"
+author: "dblodgett@usgs.gov"
+date: "11/4/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Function to get time steps -- unimportant to what we are doing.
+get_time_nc <- function(t_dim) {
+  time_units<-strsplit(t_dim$units, " ")[[1]]
+  time_step<-time_units[1]
+  date_origin<-time_units[3:length(time_units)]
+
+  if(length(date_origin) > 1) {
+    date_origin <- paste(date_origin, collapse = " ")
+  }
+
+  if(grepl("hour", time_step, ignore.case = TRUE)) {
+    multiplier <- (60^2)
+  } else if(grepl("minute", time_step, ignore.case = TRUE)) {
+    multiplier <- 60
+  } else {
+    stop("only hour time steps supported so far")
+  }
+
+  try_formats <- c("%Y-%m-%d %H:%M:%S UTC", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%OS",
+                   "%Y/%m/%d %H:%M:%OS", "%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M", "%Y-%m-%d", "%Y/%m/%d")
+  dateformat <- try_formats[sapply(try_formats, function(fmt) !is.na(as.POSIXct(date_origin, format=fmt)))][1]
+
+  origin <- as.POSIXct(strptime(date_origin,
+                                format = dateformat,
+                                tz = "UTC"),
+                       tz = "UTC")
+
+  as.POSIXct(t_dim$vals * multiplier,
+             origin = origin,
+             tz = "UTC")
+}
+library(ncdf4)
+library(arrayhelpers)
+library(sf)
+library(fasterize)
+library(gstat)
+library(raster)
+library(dplyr)
+```
+
+```{r, eval = FALSE} 
+# NetCDF4 Handling
+library(ncdf4)
+library(arrayhelpers)
+
+# Spatial
+library(sf)
+library(fasterize)
+library(gstat)
+library(raster)
+
+# How did we live without dplyr?
+library(dplyr)
+```
+```{r setup_2}
+# Let's look at the standard North Carolina sf shape.
+view_geom <- read_sf(system.file("shape/nc.shp", package="sf")) %>%
+  filter(NAME %in% c("Pamlico", "Carteret", "Hyde", "Beaufort", "Dare")) %>%
+  st_bbox() %>%
+  st_as_sfc() %>%
+  st_transform(5070) # CONUS Equal Area
+
+# This is the stageIV precipitation analysis from the NWS and NCEP
+nc <- nc_open("https://cida.usgs.gov/thredds/dodsC/stageiv_combined")
+nc_var <- "Total_precipitation_surface_1_Hour_Accumulation"
+
+# Get the lon and lat variables which are on a 2d grid
+lon <- ncvar_get(nc, "lon")
+lat <- ncvar_get(nc, "lat")
+
+# Turn them into sf_points.
+x <- matrix(rep(c(1:ncol(lon)), nrow(lon)),
+            nrow = nrow(lon), ncol = ncol(lon),
+            byrow = TRUE)
+y <- matrix(rep(c(1:nrow(lon)), ncol(lon)),
+            nrow = nrow(lon), ncol = ncol(lon),
+            byrow = FALSE)
+
+sf_points <- data.frame(x_ind = matrix(x, ncol = 1),
+                        y_ind = matrix(y, ncol = 1),
+                        lon = matrix(lon, ncol = 1),
+                        lat = matrix(lat, ncol = 1)) %>%
+  st_as_sf(coords = c("lon", "lat"),
+           crs = "+init=epsg:4326",
+           agr = "constant") %>%
+  st_transform(st_crs(view_geom)) %>%
+  st_intersection(view_geom) %>%
+  mutate(points_id = 1:nrow(.))
+
+# create mesh around points
+sf_polygons <- sf_points %>%
+  st_geometry() %>%
+  st_union() %>%
+  st_voronoi() %>%
+  st_cast() %>%
+  st_intersection(view_geom) %>%
+  st_sf() %>%
+  st_join(sf_points,
+          join = st_contains)
+
+# Get some data from Hurricane Florence. Time step shortly after landfall.
+step <- which(get_time_nc(nc$dim$time) == strptime("2018-09-14 06:00:00", format = "%Y-%m-%d %H:%M:%S", tz = "UTC"))
+
+# NetCDF trick to ensure we make our request in the right axis order.
+dimid_order <- match(nc$var[[nc_var]]$dimids,
+                     c(nc$dim$x$id, nc$dim$y$id, nc$dim$time$id))
+
+x_inds <- seq(min(sf_polygons$x), max(sf_polygons$x), 1)
+y_inds <- seq(min(sf_polygons$y), max(sf_polygons$y), 1)
+
+input_data <- ncvar_get(nc, nc_var,
+                        start <- c(min(x_inds),
+                                   min(y_inds),
+                                   step)[dimid_order],
+                        count <- c(length(x_inds),
+                                   length(y_inds),
+                                   1)[dimid_order]) %>%
+  arrayhelpers::array2df(label.x = "precip_data") %>%
+  left_join(data.frame(d1 = seq_len(length(x_inds)), x_ind = x_inds),
+            by = "d1") %>%
+  left_join(data.frame(d2 = seq_len(length(y_inds)), y_ind = y_inds),
+            by = "d2") %>%
+  inner_join(st_set_geometry(sf_polygons, NULL),
+             by = c("x_ind", "y_ind")) %>%
+  select(precip_data, points_id)
+
+ncol <- 250
+
+bbox <- st_bbox(view_geom)
+
+y_range <- as.numeric(bbox$ymax - bbox$ymin)
+x_range <- as.numeric(bbox$xmax - bbox$xmin)
+
+raster_template <- raster(ncols = ncol, nrows = y_range * (ncol/x_range),
+                          xmn =  bbox$xmin, xmx =  bbox$xmax,
+                          ymn =  bbox$ymin, ymx =  bbox$ymax,
+                          crs = st_crs(view_geom)$proj4string)
+
+sf_points <- select(sf_points, points_id)
+sf_polygons <- select(sf_polygons, points_id)
+
+# Clean up so we only have four variables left.
+rm(list=setdiff(ls(),
+                c("input_data", # data.frame with precip_data and points_id
+                  "raster_template", # RasterLayer template
+                  "sf_points", # sf data.frame with points_id and points
+                  "sf_polygons"))) # sf data.frame with points_id and voronoi polygons
+
+viz_geom <- read_sf(system.file("shape/nc.shp", package="sf")) %>%
+  st_transform(5070)
+
+plot(left_join(sf_points, input_data, by = "points_id")["precip_data"], 
+     pch = 16, reset = FALSE,
+     main = "Precip points, polygons, and raster.")
+plot(st_geometry(sf_polygons), add = TRUE)
+plot(st_geometry(viz_geom), add = TRUE)
+plot(st_geometry(st_as_sf(rasterToPolygons(raster_template))), lwd = 0.1, add = TRUE)
+```
+
+One Hour Precip (mm) as points, voronoi polygons around points, raster fishnet as overlay.
+
+```{r method_1}
+# Method 1: rasterize/fasterize -- limited intersection statistics.
+fasterize_raster <- left_join(sf_polygons, input_data, by = "points_id") %>%
+  fasterize(raster_template, field = "precip_data", fun = "max")
+
+plot(fasterize_raster, main = "Rasterized Voronoi Polygons")
+```
+
+```{r method_2}
+# Method 2: Inverse distance weighted all points.
+raster_point_idw <- idw(formula = precip_data~1,
+                        locations = as_Spatial(left_join(sf_points, input_data, by = "points_id")),
+                        newdata = raster::rasterToPoints(raster_template, spatial = TRUE))
+raster_point_idw@data <- select(raster_point_idw@data, var1.pred)
+raster_point_idw <- rasterize(raster_point_idw, raster_template)
+
+plot(raster_point_idw$var1.pred, main = "Inverse Distance Weighted")
+```
+
+```{r method_3}
+# Method 3: Nearest neighbor
+raster_point_nn <- idw(formula = precip_data~1,
+                       locations = as_Spatial(left_join(sf_points, input_data, by = "points_id")),
+                       newdata = raster::rasterToPoints(raster_template, spatial = TRUE),
+                       nmax = 1)
+raster_point_nn@data <- select(raster_point_nn@data, var1.pred)
+raster_point_nn_r <- rasterize(raster_point_nn, raster_template)
+
+plot(raster_point_nn_r$var1.pred, main = "Nearest Neighbor")
+
+rm(fasterize_raster, raster_point_idw, raster_point_nn)
+```
+
+```{r method_4}
+# Method 4: Area weighted intersection.
+raster_template_poly <- st_as_sf(rasterToPolygons(raster_template)) %>%
+  select(-layer) %>%
+  mutate(raster_id = 1:nrow(.))
+
+# Get individual intersection areas. (as.numeric removes units)
+intersection_area <- st_intersection(raster_template_poly,
+                                     left_join(select(sf_polygons, points_id),
+                                               select(input_data, precip_data, points_id),
+                                               by = "points_id")) %>%
+  mutate(area = as.numeric(st_area(.))) %>%
+  group_by(raster_id) %>%
+  st_set_geometry(NULL) %>%
+  # Get sum of area by input_id and join to intersection.
+  left_join(.,
+            summarise(.,
+                      raster_id_area = sum(area)),
+            by = "raster_id") %>%
+  # Calculate percent of id_area of each incremental area.
+  mutate(.,
+         percent_covers = area/raster_id_area) %>%
+  select(points_id, raster_id, percent_covers) %>%
+  ungroup()
+
+raster_aw <- right_join(input_data, intersection_area,
+                        by = c("points_id")) %>%
+  mutate(precip_data = precip_data * percent_covers) %>%
+  group_by(raster_id) %>%
+  summarise(precip_data = sum(precip_data, na.rm = T)) %>%
+  ungroup() %>%
+  right_join(raster_template_poly, by = "raster_id") %>%
+  st_sf()
+
+plot(raster_aw["precip_data"], border = "transparent", main = "Pre-raster conversion precip")
+
+plot(raster_template_poly["raster_id"], border = "transparent", main = "Check that matrix to raster works.")
+
+raster_template_id_check <- matrix(raster_template_poly$raster_id,
+                                   nrow = nrow(raster_template),
+                                   byrow = TRUE) %>%
+  raster(template = raster_template)
+
+plot(raster_template_id_check$layer, main = "Check that matrix to raster works.")
+
+raster_aw <- matrix(st_set_geometry(raster_aw, NULL)$precip_data,
+                    nrow = nrow(raster_template),
+                    byrow = TRUE) %>%
+  raster(template = raster_template)
+
+plot(raster_aw, "Area-Weighted Intersection.")
+```
