@@ -1,6 +1,9 @@
+.drake*
 .Rhistory
 *.DS_Store
 .Rproj.user
 *.gdb
 *.csv
 *.Rdata
+*.nc
+*.gpkg
