@@ -37,11 +37,17 @@ plan <- drake_plan(
                         service = "qw") %>% 
     filter(!is.na(parm_cd),
            count_nu > 150),
-  Daily = EGRET::readNWISDaily(siteNumber = whatFlow$site_no[1]),
-  Sample = EGRET::readNWISSample(siteNumber = whatFlow$site_no[1], parameterCd = "00095"),
+  Sample = EGRET::readNWISSample(siteNumber = whatFlow$site_no[1], parameterCd = "00095") %>% 
+    filter(ConcHigh > 10,
+           !duplicated(Date)),
+  Daily = EGRET::readNWISDaily(siteNumber = whatFlow$site_no[1],
+                               startDate = min(Sample$Date), 
+                               endDate = max(Sample$Date)),
   INFO = EGRET::readNWISInfo(whatFlow$site_no[1], parameterCd = "00095", interactive = FALSE),
-  eList_init = EGRET::mergeReport(INFO = INFO, Daily = Daily, Sample = Sample),
-  eList = EGRET::modelEstimation(eList_init)
+  eList = EGRET::mergeReport(INFO = INFO, Daily = Daily, Sample = Sample) %>% 
+    EGRET::modelEstimation() %>% 
+    EGRET::blankTime(startBlank = "1991-10-01", 
+                     endBlank = "2008-01-01")
 )
 
 make(plan)
