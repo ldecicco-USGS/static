@@ -1,0 +1,151 @@
+R tools for water resources
+========================================================
+author: David Blodgett and Laura DeCicco
+date: 11/1/2019
+autosize: true
+
+Introduction
+========================================================
+
+These slides provide resources and examples for 
+common water resources applications in the R programming
+language. 
+
+They are organized in a structure for the 
+uninitiated but are intended to be useful as reference
+materials.
+
+***
+
+- Introduction to examples
+- Background and resources
+- Data access
+- Data visualization
+- Spatial intersection
+- Water budget analysis
+- Trend analysis
+- Synthesis
+
+Water budget example as created below
+========================================================
+Short description of use case goes here.
+```{r wb_example_map, echo = FALSE, fig.height = 6}
+plot(sf::st_geometry(sf::read_sf(system.file("shape/nc.shp", package = "sf"))))
+```
+***
+
+```{r wb_example_plot, echo = FALSE}
+plot(cars)
+```
+
+Water quality trends as created below
+========================================================
+
+```{r tr_example_map, echo = FALSE, fig.height = 6}
+plot(sf::st_geometry(sf::read_sf(system.file("shape/nc.shp", package = "sf"))))
+```
+***
+
+```{r tr_example_plot, echo = FALSE}
+plot(cars)
+```
+
+Background and resources
+========================================================
+Background background background
+
+***
+
+Resources resources resources
+
+Spatial Data Access 
+========================================================
+The following shows how to use functions xyz from packages xyz.
+See full examples [here.](https://link)
+```{r spatial}
+nc <- sf::read_sf(system.file("shape/nc.shp", package = "sf"))
+```
+
+Observation Data Access 
+========================================================
+The following shows how to use functions xyz from packages xyz,
+See full examples [here.](https://link)
+```{r observations}
+x <- c(1, 2, 3)
+```
+
+Spatial Data Visualization 
+========================================================
+lorem ipsum
+```{r spatial_map_code, eval = FALSE}
+plot(sf::st_geometry(nc)))
+```
+
+***
+
+```{r spatial_map, echo = FALSE, fig.height = 6}
+plot(sf::st_geometry(nc))
+```
+
+Spatial Data Visualization 
+========================================================
+lorem ipsum
+```{r obs_map_code, eval = FALSE}
+plot(x)
+```
+
+***
+
+```{r obs_map, echo = FALSE, fig.height = 6}
+plot(x)
+```
+
+Spatial Intersection
+========================================================
+```{r intersectr}
+library(intersectr)
+```
+
+Water Budget Analysis
+========================================================
+```{r wb}
+q <- 1
+e <- 0.5
+p <- 1.5
+
+setNames(p - q - e, "Change in Storage")
+```
+
+
+Trend Analysis
+========================================================
+```{r egret}
+library(EGRET)
+```
+
+========================================================
+Here be some cool plot!
+```{r summary, fig.height = 6}
+plot(cars)
+```
+***
+Here be some cool plot!
+```{r summary2, fig.height = 6}
+plot(cars)
+```
+
+Summary
+========================================================
+- we showed this
+- we showed that
+- this is cool
+- that is cool
+- go here to see more of this
+- go here to see more of that
+
+***
+
+```{r summary3, fig.height = 6, echo = FALSE}
+plot(cars, main = "final cool plot")
+```
+
