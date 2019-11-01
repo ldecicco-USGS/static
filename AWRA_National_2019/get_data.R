@@ -1,4 +1,5 @@
 library(drake)
+library(dplyr)
 # https://mikejohnson51.github.io/AOI/
 
 plan <- drake_plan(
@@ -14,11 +15,33 @@ plan <- drake_plan(
   nwissite = nhdplusTools::navigate_nldi(nldi_feature = nldi_feature, 
                                          mode = "upstreamTributaries", 
                                          data_source = "nwissite"),
+  wqpsite = nhdplusTools::navigate_nldi(nldi_feature = nldi_feature, 
+                                         mode = "upstreamTributaries", 
+                                         data_source = "wqp"),
   nhdp = nhdplusTools::subset_nhdplus(UT$nhdplus_comid, 
-                                      output_file = "data/nhdp_subset.gpkg", 
+                                      output_file = file_out("data/nhdp_subset.gpkg"), 
                                       nhdplus_data = "download", 
                                       status = TRUE, 
-                                      overwrite = TRUE)
+                                      overwrite = TRUE),
+  usgs_sites = gsub(pattern = "USGS-",
+                     replacement = "", 
+                     x = nwissite$identifier),
+  whatFlow = dataRetrieval::whatNWISdata(siteNumber = usgs_sites,
+                                         parameterCd = "00060",
+                                         statCd = "00003",
+                                         service="dv") %>% 
+    filter(end_date >= Sys.Date()-1) %>% 
+    arrange(desc(count_nu)),
+  flowData = dataRetrieval::readNWISdv(siteNumbers = whatFlow$site_no[1], "00060"),
+  whatWQ = dataRetrieval::whatNWISdata(siteNumber = usgs_sites,
+                        service = "qw") %>% 
+    filter(!is.na(parm_cd),
+           count_nu > 150),
+  Daily = EGRET::readNWISDaily(siteNumber = whatFlow$site_no[1]),
+  Sample = EGRET::readNWISSample(siteNumber = whatFlow$site_no[1], parameterCd = "00095"),
+  INFO = EGRET::readNWISInfo(whatFlow$site_no[1], parameterCd = "00095", interactive = FALSE),
+  eList_init = EGRET::mergeReport(INFO = INFO, Daily = Daily, Sample = Sample),
+  eList = EGRET::modelEstimation(eList_init)
 )
 
 make(plan)
