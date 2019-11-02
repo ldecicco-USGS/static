@@ -47,7 +47,19 @@ plan <- drake_plan(
   eList = EGRET::mergeReport(INFO = INFO, Daily = Daily, Sample = Sample) %>% 
     EGRET::modelEstimation() %>% 
     EGRET::blankTime(startBlank = "1991-10-01", 
-                     endBlank = "2008-01-01")
+                     endBlank = "2008-01-01"),
+  simple_site = list(featureSource = "nwissite", 
+               featureID = paste0("USGS-", whatFlow$site_no[1])),
+  simple_UT = navigate_nldi(simple_site, "upstreamTributaries", ""),
+  simple_UT_site = navigate_nldi(simple_site, "upstreamTributaries", "nwissite"),
+  simple_gpkg = "data/simple_nhdp.gpkg",
+  simple_nhdp = nhdplusTools::subset_nhdplus(simple_UT$nhdplus_comid, 
+                                             output_file = simple_gpkg, 
+                                             nhdplus_data = "download", 
+                                             status = TRUE, 
+                                             overwrite = TRUE),
+  flowline = sf::read_sf(simple_gpkg, "NHDFlowline_Network"),
+  catchment = sf::read_sf(simple_gpkg, "CatchmentSP")
 )
 
 make(plan)

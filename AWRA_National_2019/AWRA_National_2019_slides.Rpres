@@ -4,16 +4,15 @@ author: David Blodgett and Laura DeCicco
 date: 11/1/2019
 autosize: true
 
-Introduction
 ========================================================
+**Introduction**
 
-These slides provide resources and examples for 
+These slides provide resources and examples for two
 common water resources applications in the R programming
 language. 
 
-They are organized in a structure for the 
-uninitiated but are intended to be useful as reference
-materials.
+A companion workflow to get all the data and perform
+processing operations is available [here](https://github.com/dblodgett-usgs/static/blob/master/AWRA_National_2019/get_data.R).
 
 ***
 
@@ -26,9 +25,11 @@ materials.
 - Trend analysis
 - Synthesis
 
-Water budget example as created below
 ========================================================
-Short description of use case goes here.
+Application 1: Water Budget  
+
+Access and compare precipitation, evapotranspiration and 
+streamflow.
 ```{r wb_example_map, echo = FALSE, fig.height = 6}
 plot(sf::st_geometry(sf::read_sf(system.file("shape/nc.shp", package = "sf"))))
 ```
@@ -38,11 +39,10 @@ plot(sf::st_geometry(sf::read_sf(system.file("shape/nc.shp", package = "sf"))))
 plot(cars)
 ```
 
-Water quality trends and data exploration
 ========================================================
+Application 2: Trends and Plotting  
 
-Exploration and Graphics for RivEr Trends ([EGRET](http://usgs-r.github.io/EGRET/)): An R-package for the analysis of long-term changes in water quality and streamflow.
-
+<small>Exploration and Graphics for RivEr Trends ([EGRET](http://usgs-r.github.io/EGRET/)): A package for analysis of long-term changes in water quality and streamflow.</small>
 ```{r trend1, echo = FALSE,   fig.width = 5, fig.height = 5}
 library(EGRET)
 library(drake)
@@ -55,31 +55,69 @@ plotConcHist(eList)
 plot(eList)
 ```
 
-
-Background and resources
 ========================================================
 
-Background:
-* 
-* 
-* 
+Background:  
+* R hydro tools build on packages.
+* [tidyverse](https://www.tidyverse.org/), [r-spatial](https://www.r-spatial.org/), etc.
+* Plotting with [base-r](https://rstudio-pubs-static.s3.amazonaws.com/84527_6b8334fd3d9348579681b24d156e7e9d.html) and [ggplot2](https://ggplot2.tidyverse.org/).
+* Web-search is your friend!
 
 ***
-Resources
+
+Resources:  
 * [Github USGS-R](https://github.com/USGS-R)
 * [USGS Resources](https://owi.usgs.gov/R/)
 * [USGS Blogs](https://waterdata.usgs.gov/blog/tags/r/)
-* [CRAN Task View: Hydrological Data and Modeling](https://cran.r-project.org/web/views/Hydrology.html)
+* [CRAN Task View](https://cran.r-project.org/web/views/Hydrology.html)
 
 Spatial Data Access 
 ========================================================
-The following shows how to use functions xyz from packages xyz.
-See full examples [here.](https://link)
-```{r spatial}
-nc <- sf::read_sf(system.file("shape/nc.shp", package = "sf"))
+See nhdplusTools tutorial [here.](https://usgs-r.github.io/nhdplusTools/articles/nhdplusTools.html)
+```{r spatial, eval = FALSE, echo = TRUE}
+library(nhdplusTools)
+site <- list(featureSource = "nwissite", 
+             featureID = "USGS-10128500")
+
+ut_line <- navigate_nldi(site, "UT", "")
+ut_site <- navigate_nldi(site, "UT", "nwissite")
+
+nhdp <- subset_nhdplus(ut$nhdplus_comid, 
+                       "nhdp_subset.gpkg", 
+                       "download")
 ```
 
-Observation Data Access 
+========================================================
+```{r plot simple, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 8}
+library(sf)
+library(prettymapr)
+library(rosm)
+loadd(flowline)
+loadd(catchment)
+loadd(simple_UT_site)
+
+sp_bbox <- function(g) {
+  matrix(as.numeric(st_bbox(g)), 
+         nrow = 2, dimnames = list(c("x", "y"), 
+                                   c("min", "max")))
+}
+
+prep_layer <- function(x) st_geometry(st_transform(x, 3857))
+
+st_precision(catchment) = 10000
+boundary <- st_union(st_geometry(catchment))
+
+prettymap({
+  osm.plot(sp_bbox(catchment), type = "cartolight", quiet = TRUE)
+  plot(prep_layer(catchment), lwd = 0.5, col = NA, border = "grey", add = TRUE)
+    plot(prep_layer(boundary), lwd = 1, col = NA, border = "black", add = TRUE)
+  plot(prep_layer(flowline), lwd = flowline$streamorde - 0.5, col = "blue", add = TRUE)
+  plot(prep_layer(simple_UT_site), col = "red", pch = 17, add = TRUE)
+}, drawarrow = TRUE, title = paste("NHDPlus Upstream of Gage:", simple_UT_site$name), 
+scale.label.cex = 2, arrow.scale = 2)
+```
+
+Observations Data Access 
 ========================================================
 
 See a dataRetrieval tutorial [here.](https://owi.usgs.gov/R/dataRetrieval.html#1)
@@ -88,7 +126,7 @@ library(dataRetrieval)
 flow <- readNWISdv("10128500", "00060")
 ```
 
-```{r observationsRun,   eval = TRUE, echo = FALSE, fig.width = 10}
+```{r observationsRun,   eval = TRUE, echo = FALSE, fig.width = 12, fig.height = 5}
 loadd(flowData)
 parameterInfo <- attr(flowData, "variableInfo")
 siteInfo <- attr(flowData, "siteInfo")
@@ -116,13 +154,13 @@ Spatial Data Visualization
 ========================================================
 lorem ipsum
 ```{r spatial_map_code, eval = FALSE}
-plot(sf::st_geometry(nc)))
+plot(sf::st_geometry(flowline)))
 ```
 
 ***
 
 ```{r spatial_map, echo = FALSE, fig.height = 6}
-plot(sf::st_geometry(nc))
+plot(sf::st_geometry(flowline))
 ```
 
 Spatial Data Visualization 
