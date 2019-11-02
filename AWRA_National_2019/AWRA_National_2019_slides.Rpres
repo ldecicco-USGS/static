@@ -38,25 +38,38 @@ plot(sf::st_geometry(sf::read_sf(system.file("shape/nc.shp", package = "sf"))))
 plot(cars)
 ```
 
-Water quality trends as created below
+Water quality trends and data exploration
 ========================================================
 
-```{r tr_example_map, echo = FALSE, fig.height = 6}
-plot(sf::st_geometry(sf::read_sf(system.file("shape/nc.shp", package = "sf"))))
+Exploration and Graphics for RivEr Trends ([EGRET](http://usgs-r.github.io/EGRET/)): An R-package for the analysis of long-term changes in water quality and streamflow.
+
+```{r trend1, echo = FALSE,   fig.width = 5, fig.height = 5}
+library(EGRET)
+library(drake)
+loadd(eList)
+plotConcHist(eList)
+
 ```
 ***
-
-```{r tr_example_plot, echo = FALSE}
-plot(cars)
+```{r trend2, echo = FALSE}
+plot(eList)
 ```
+
 
 Background and resources
 ========================================================
-Background background background
+
+Background:
+* 
+* 
+* 
 
 ***
-
-Resources resources resources
+Resources
+* [Github USGS-R](https://github.com/USGS-R)
+* [USGS Resources](https://owi.usgs.gov/R/)
+* [USGS Blogs](https://waterdata.usgs.gov/blog/tags/r/)
+* [CRAN Task View: Hydrological Data and Modeling](https://cran.r-project.org/web/views/Hydrology.html)
 
 Spatial Data Access 
 ========================================================
@@ -68,11 +81,36 @@ nc <- sf::read_sf(system.file("shape/nc.shp", package = "sf"))
 
 Observation Data Access 
 ========================================================
-The following shows how to use functions xyz from packages xyz,
-See full examples [here.](https://link)
-```{r observations}
-x <- c(1, 2, 3)
+
+See a dataRetrieval tutorial [here.](https://owi.usgs.gov/R/dataRetrieval.html#1)
+```{r observations,   eval = FALSE, echo = TRUE}
+library(dataRetrieval)
+flow <- readNWISdv("10128500", "00060")
 ```
+
+```{r observationsRun,   eval = TRUE, echo = FALSE, fig.width = 10}
+loadd(flowData)
+parameterInfo <- attr(flowData, "variableInfo")
+siteInfo <- attr(flowData, "siteInfo")
+
+unescape_html <- function(str){
+  fancy_chars <- regmatches(str, gregexpr("&#\\d{3};",str)) 
+
+  unescaped <- xml2::xml_text(xml2::read_html(paste0("<x>", fancy_chars, "</x>")))
+
+  fancy_chars <- gsub(pattern = "&#\\d{3};", 
+                      replacement = unescaped, x = str)
+
+  fancy_chars <- gsub("Â","", fancy_chars)
+  return(fancy_chars)
+}
+
+plot(flowData$Date, flowData$X_00060_00003,
+     xlab = "Date", pch = ".", col="red",
+     ylab = unescape_html (parameterInfo$variableName))
+
+```
+
 
 Spatial Data Visualization 
 ========================================================
@@ -96,7 +134,7 @@ plot(x)
 
 ***
 
-```{r obs_map, echo = FALSE, fig.height = 6}
+```{r obs_map, eval = FALSE, echo = FALSE, fig.height = 6}
 plot(x)
 ```
 
@@ -119,19 +157,30 @@ setNames(p - q - e, "Change in Storage")
 
 Trend Analysis
 ========================================================
-```{r egret}
+```{r egret,  echo = TRUE, eval = FALSE}
 library(EGRET)
+Daily <- readNWISDaily(siteNumber = "10128500")
+Sample = readNWISSample(siteNumber = "10128500",
+                        parameterCd = "00095",
+                        endDate = "2018-01-01")
+INFO = readNWISInfo(siteNumber = "10128500",
+                    parameterCd = "00095",
+                    interactive = FALSE)
+eList = mergeReport(INFO = INFO,
+                    Daily = Daily,
+                    Sample = Sample) %>% 
+    modelEstimation()
 ```
 
 ========================================================
 Here be some cool plot!
 ```{r summary, fig.height = 6}
-plot(cars)
+plotContours(eList, 1980, 2012, flowDuration = FALSE)
 ```
 ***
 Here be some cool plot!
 ```{r summary2, fig.height = 6}
-plot(cars)
+plotDiffContours(eList, 1980, 2012)
 ```
 
 Summary
