@@ -1,6 +1,7 @@
 library(drake)
 library(dplyr)
 source("R/intersectr.R")
+source("R/wb_funs.R")
 # https://mikejohnson51.github.io/AOI/
 
 set_precision <- function(x, prec) {
@@ -78,17 +79,19 @@ plan <- drake_plan(
                                              status = TRUE, 
                                              overwrite = TRUE),
   flowline = sf::read_sf(simple_nhdp, "NHDFlowline_Network"),
-  catchment = set_precision(sf::read_sf(simple_nhdp, "CatchmentSP"), 10000),
+  catchment = sf::st_as_sf(dplyr::select(set_precision(sf::read_sf(simple_nhdp, "CatchmentSP"), 10000), 
+                                         ID = featureid,
+                                         a = areasqkm)),
   boundary = sf::st_sf(ID = simple_site$featureID, st_union(st_geometry(catchment))),
   plot_box = sp_bbox(sf::st_transform(catchment, 4326)),
-  ### Intersections with hisotorical weather.
+  ### Intersections with historical weather.
   ann_prj = "+init=epsg:5070", # Albers equal area for CONUS
   buffer_dist = 1000, # units of ann_prj (m)
   # See https://cida.usgs.gov/thredds/ for source server
   # See https://cida.usgs.gov/thredds/dodsC/UofIMETDATA.html for metadata
   gridmet = "https://cida.usgs.gov/thredds/dodsC/UofIMETDATA", 
   gridmet_var = "precipitation_amount",
-  gridmet_data = run_intersection(gridmet, gridmet_var, boundary, ann_prj, 
+  gridmet_data = run_intersection(gridmet, gridmet_var, catchment, ann_prj, 
                                   buffer_dist = buffer_dist, status = TRUE, 
                                   start_datetime = "2009-10-01 00:00:00",
                                   end_datetime = "2010-10-01 00:00:00", 
@@ -96,11 +99,14 @@ plan <- drake_plan(
   # See https://cida.usgs.gov/thredds/dodsC/ssebopeta/monthly.html for metadata
   sseb = "https://cida.usgs.gov/thredds/dodsC/ssebopeta/monthly",
   sseb_var = "et",
-  sseb_data = run_intersection(sseb, sseb_var, boundary, ann_prj, 
+  sseb_data = run_intersection(sseb, sseb_var, catchment, ann_prj, 
                                buffer_dist = buffer_dist, status = TRUE, 
                                start_datetime = "2009-10-01 00:00:00",
                                end_datetime = "2010-10-01 00:00:00", 
-                               return_cell_geometry = TRUE)
+                               return_cell_geometry = TRUE),
+  plot_gridmet = dplyr::left_join(catchment, get_plot_data(gridmet_data$intersection), by = "ID"),
+  plot_sseb = dplyr::left_join(catchment, get_plot_data(sseb_data$intersection), by = "ID"),
+  wb_summary = get_wb(catchment, flowData, sseb_data, gridmet_data)
 )
 
 make(plan)
