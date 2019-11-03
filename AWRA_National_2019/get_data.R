@@ -1,5 +1,6 @@
 library(drake)
 library(dplyr)
+source("R/intersectr.R")
 # https://mikejohnson51.github.io/AOI/
 
 set_precision <- function(x, prec) {
@@ -40,7 +41,7 @@ plan <- drake_plan(
   nhd_cat = sf::read_sf(nhdp, "CatchmentSP"),
   nhd_area = sf::read_sf(nhdp, "NHDArea"),
   nhd_wbody = sf::read_sf(nhdp, "NHDWaterbody"),
-  nhd_bbox = sp_bbox(st_transform(nhd_fline_p, 4326)),
+  nhd_bbox = sp_bbox(st_transform(nhd_fline, 4326)),
   outlet_name = nhd_fline_p$gnis_name[which(nhd_fline_p$hydroseq == min(nhd_fline_p$hydroseq))],
   usgs_sites = gsub(pattern = "USGS-",
                      replacement = "", 
@@ -78,8 +79,28 @@ plan <- drake_plan(
                                              overwrite = TRUE),
   flowline = sf::read_sf(simple_nhdp, "NHDFlowline_Network"),
   catchment = set_precision(sf::read_sf(simple_nhdp, "CatchmentSP"), 10000),
-  boundary = st_union(st_geometry(catchment)),
-  plot_box = sp_bbox(st_transform(catchment, 4326))
+  boundary = sf::st_sf(ID = simple_site$featureID, st_union(st_geometry(catchment))),
+  plot_box = sp_bbox(st_transform(catchment, 4326)),
+  ### Intersections with hisotorical weather.
+  ann_prj = "+init=epsg:5070", # Albers equal area for CONUS
+  buffer_dist = 1000, # units of ann_prj (m)
+  # See https://cida.usgs.gov/thredds/ for source server
+  # See https://cida.usgs.gov/thredds/dodsC/UofIMETDATA.html for metadata
+  gridmet = "https://cida.usgs.gov/thredds/dodsC/UofIMETDATA", 
+  gridmet_var = "precipitation_amount",
+  gridmet_data = run_intersection(gridmet, gridmet_var, boundary, ann_prj, 
+                                  buffer_dist = buffer_dist, status = TRUE, 
+                                  start_datetime = "2009-10-01 00:00:00",
+                                  end_datetime = "2010-10-01 00:00:00", 
+                                  return_cell_geometry = TRUE),
+  # See https://cida.usgs.gov/thredds/dodsC/ssebopeta/monthly.html for metadata
+  sseb = "https://cida.usgs.gov/thredds/dodsC/ssebopeta/monthly",
+  sseb_var = "et",
+  sseb_data = run_intersection(sseb, sseb_var, boundary, ann_prj, 
+                               buffer_dist = buffer_dist, status = TRUE, 
+                               start_datetime = "2009-10-01 00:00:00",
+                               end_datetime = "2010-10-01 00:00:00", 
+                               return_cell_geometry = TRUE)
 )
 
 make(plan)
