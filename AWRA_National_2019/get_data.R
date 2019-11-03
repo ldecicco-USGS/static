@@ -70,8 +70,8 @@ plan <- drake_plan(
                      endBlank = "2008-01-01"),
   simple_site = list(featureSource = "nwissite", 
                featureID = paste0("USGS-", whatFlow$site_no[1])),
-  simple_UT = navigate_nldi(simple_site, "upstreamTributaries", ""),
-  simple_UT_site = navigate_nldi(simple_site, "upstreamTributaries", "nwissite"),
+  simple_UT = nhdplusTools::navigate_nldi(simple_site, "upstreamTributaries", ""),
+  simple_UT_site = nhdplusTools::navigate_nldi(simple_site, "upstreamTributaries", "nwissite"),
   simple_nhdp = nhdplusTools::subset_nhdplus(simple_UT$nhdplus_comid, 
                                              output_file = file_out("data/simple_nhdp.gpkg"), 
                                              nhdplus_data = "download", 
@@ -80,7 +80,7 @@ plan <- drake_plan(
   flowline = sf::read_sf(simple_nhdp, "NHDFlowline_Network"),
   catchment = set_precision(sf::read_sf(simple_nhdp, "CatchmentSP"), 10000),
   boundary = sf::st_sf(ID = simple_site$featureID, st_union(st_geometry(catchment))),
-  plot_box = sp_bbox(st_transform(catchment, 4326)),
+  plot_box = sp_bbox(sf::st_transform(catchment, 4326)),
   ### Intersections with hisotorical weather.
   ann_prj = "+init=epsg:5070", # Albers equal area for CONUS
   buffer_dist = 1000, # units of ann_prj (m)
