@@ -4,12 +4,12 @@ source("R/intersectr.R")
 # https://mikejohnson51.github.io/AOI/
 
 set_precision <- function(x, prec) {
-  st_precision(x) = prec
+  sf::st_precision(x) = prec
   x
 }
 
 sp_bbox <- function(g) {
-  matrix(as.numeric(st_bbox(g)), 
+  matrix(as.numeric(sf::st_bbox(g)), 
          nrow = 2, dimnames = list(c("x", "y"), 
                                    c("min", "max")))
 }
@@ -42,7 +42,7 @@ plan <- drake_plan(
   nhd_area = sf::read_sf(nhdp, "NHDArea"),
   nhd_wbody = sf::read_sf(nhdp, "NHDWaterbody"),
   nhd_bbox = sp_bbox(st_transform(nhd_fline, 4326)),
-  outlet_name = nhd_fline_p$gnis_name[which(nhd_fline_p$hydroseq == min(nhd_fline_p$hydroseq))],
+  outlet_name = nhd_fline_p$gnis_name[which(nhd_fline$hydroseq == min(nhd_fline$hydroseq))],
   usgs_sites = gsub(pattern = "USGS-",
                      replacement = "", 
                      x = nwissite$identifier),
