@@ -4,12 +4,12 @@ source("R/intersectr.R")
 # https://mikejohnson51.github.io/AOI/
 
 set_precision <- function(x, prec) {
-  st_precision(x) = prec
+  sf::st_precision(x) = prec
   x
 }
 
 sp_bbox <- function(g) {
-  matrix(as.numeric(st_bbox(g)), 
+  matrix(as.numeric(sf::st_bbox(g)), 
          nrow = 2, dimnames = list(c("x", "y"), 
                                    c("min", "max")))
 }
@@ -42,7 +42,7 @@ plan <- drake_plan(
   nhd_area = sf::read_sf(nhdp, "NHDArea"),
   nhd_wbody = sf::read_sf(nhdp, "NHDWaterbody"),
   nhd_bbox = sp_bbox(st_transform(nhd_fline, 4326)),
-  outlet_name = nhd_fline_p$gnis_name[which(nhd_fline_p$hydroseq == min(nhd_fline_p$hydroseq))],
+  outlet_name = nhd_fline$gnis_name[which(nhd_fline$hydroseq == min(nhd_fline$hydroseq))],
   usgs_sites = gsub(pattern = "USGS-",
                      replacement = "", 
                      x = nwissite$identifier),
@@ -70,8 +70,8 @@ plan <- drake_plan(
                      endBlank = "2008-01-01"),
   simple_site = list(featureSource = "nwissite", 
                featureID = paste0("USGS-", whatFlow$site_no[1])),
-  simple_UT = navigate_nldi(simple_site, "upstreamTributaries", ""),
-  simple_UT_site = navigate_nldi(simple_site, "upstreamTributaries", "nwissite"),
+  simple_UT = nhdplusTools::navigate_nldi(simple_site, "upstreamTributaries", ""),
+  simple_UT_site = nhdplusTools::navigate_nldi(simple_site, "upstreamTributaries", "nwissite"),
   simple_nhdp = nhdplusTools::subset_nhdplus(simple_UT$nhdplus_comid, 
                                              output_file = file_out("data/simple_nhdp.gpkg"), 
                                              nhdplus_data = "download", 
@@ -80,7 +80,7 @@ plan <- drake_plan(
   flowline = sf::read_sf(simple_nhdp, "NHDFlowline_Network"),
   catchment = set_precision(sf::read_sf(simple_nhdp, "CatchmentSP"), 10000),
   boundary = sf::st_sf(ID = simple_site$featureID, st_union(st_geometry(catchment))),
-  plot_box = sp_bbox(st_transform(catchment, 4326)),
+  plot_box = sp_bbox(sf::st_transform(catchment, 4326)),
   ### Intersections with hisotorical weather.
   ann_prj = "+init=epsg:5070", # Albers equal area for CONUS
   buffer_dist = 1000, # units of ann_prj (m)
