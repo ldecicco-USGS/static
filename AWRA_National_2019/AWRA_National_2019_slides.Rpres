@@ -116,7 +116,9 @@ Resources:
 
 Spatial Data Access 
 ========================================================
+class: small-code
 See nhdplusTools tutorial [here.](https://usgs-r.github.io/nhdplusTools/articles/nhdplusTools.html)
+
 ```{r spatial, eval = FALSE, echo = TRUE}
 library(nhdplusTools)
 site <- list(featureSource = "nwissite", 
@@ -155,7 +157,7 @@ scale.label.cex = 2, arrow.scale = 2)
 
 Observations Data Access 
 ========================================================
-
+class: small-code
 See a dataRetrieval tutorial [here.](https://owi.usgs.gov/R/dataRetrieval.html#1)
 ```{r observations,   eval = FALSE, echo = TRUE}
 library(dataRetrieval)
@@ -278,6 +280,7 @@ setNames(p - q - e, "Change in Storage")
 
 Trend Analysis
 ========================================================
+class: small-code
 ```{r egret,  echo = TRUE, eval = FALSE}
 library(EGRET)
 Daily <- readNWISDaily(siteNumber = "10128500")
@@ -294,6 +297,7 @@ eList = mergeReport(INFO = INFO,
 ```
 
 ========================================================
+class: small-code
 Here be some cool plot!
 ```{r summary, fig.height = 6}
 plotContours(eList, 1980, 2012, flowDuration = FALSE)
