@@ -2,6 +2,17 @@ library(drake)
 library(dplyr)
 # https://mikejohnson51.github.io/AOI/
 
+set_precision <- function(x, prec) {
+  st_precision(x) = prec
+  x
+}
+
+sp_bbox <- function(g) {
+  matrix(as.numeric(st_bbox(g)), 
+         nrow = 2, dimnames = list(c("x", "y"), 
+                                   c("min", "max")))
+}
+
 plan <- drake_plan(
   start_location = AOI::geocode(location = "Great Salt Lake", pt = TRUE),
   start_nhdplusid = nhdplusTools::discover_nhdplus_id(start_location$pt$geometry),
@@ -23,6 +34,14 @@ plan <- drake_plan(
                                       nhdplus_data = "download", 
                                       status = TRUE, 
                                       overwrite = TRUE),
+  nhd_basin = nhdplusTools::get_nldi_basin(nldi_feature),
+  nhd_fline = sf::st_as_sf(dplyr::filter(sf::read_sf(nhdp, "NHDFlowline_Network"), 
+                                         ftype != "ArtificialPath")),
+  nhd_cat = sf::read_sf(nhdp, "CatchmentSP"),
+  nhd_area = sf::read_sf(nhdp, "NHDArea"),
+  nhd_wbody = sf::read_sf(nhdp, "NHDWaterbody"),
+  nhd_bbox = sp_bbox(st_transform(nhd_fline_p, 4326)),
+  outlet_name = nhd_fline_p$gnis_name[which(nhd_fline_p$hydroseq == min(nhd_fline_p$hydroseq))],
   usgs_sites = gsub(pattern = "USGS-",
                      replacement = "", 
                      x = nwissite$identifier),
@@ -52,14 +71,15 @@ plan <- drake_plan(
                featureID = paste0("USGS-", whatFlow$site_no[1])),
   simple_UT = navigate_nldi(simple_site, "upstreamTributaries", ""),
   simple_UT_site = navigate_nldi(simple_site, "upstreamTributaries", "nwissite"),
-  simple_gpkg = "data/simple_nhdp.gpkg",
   simple_nhdp = nhdplusTools::subset_nhdplus(simple_UT$nhdplus_comid, 
-                                             output_file = simple_gpkg, 
+                                             output_file = file_out("data/simple_nhdp.gpkg"), 
                                              nhdplus_data = "download", 
                                              status = TRUE, 
                                              overwrite = TRUE),
-  flowline = sf::read_sf(simple_gpkg, "NHDFlowline_Network"),
-  catchment = sf::read_sf(simple_gpkg, "CatchmentSP")
+  flowline = sf::read_sf(simple_nhdp, "NHDFlowline_Network"),
+  catchment = set_precision(sf::read_sf(simple_nhdp, "CatchmentSP"), 10000),
+  boundary = st_union(st_geometry(catchment)),
+  plot_box = sp_bbox(st_transform(catchment, 4326))
 )
 
 make(plan)
