@@ -62,25 +62,44 @@ processing operations is available [here](https://github.com/dblodgett-usgs/stat
 - Trend analysis
 - Synthesis
 
-========================================================
-Application 1: Water Budget  
 
-Access and compare precipitation, evapotranspiration and 
-streamflow.
-```{r wb_example_map, echo = FALSE, fig.height = 6}
-plot(sf::st_geometry(sf::read_sf(system.file("shape/nc.shp", package = "sf"))))
+```{r setup, echo = FALSE}
+source("get_data.R")
+```
+========================================================
+left: 40%
+
+Application 1:  
+Water Budget  
+
+<small>Access and compare precip, actual ET, and 
+streamflow.</small>  
+```{r wb_example_map, echo = FALSE, fig.height = 5}
+loadd(plot_sseb)
+loadd(plot_gridmet)
+loadd(flowline)
+plot_gridmet$diff <- plot_gridmet$sum - plot_sseb$sum
+plot(plot_gridmet["diff"], main = "Difference of Precipitation and Evapotranspiration, (mm)", reset = FALSE)
+plot(sf::st_geometry(flowline), lwd = flowline$streamorde - 0.5, col = "darkblue", add = TRUE)
 ```
 ***
 
 ```{r wb_example_plot, echo = FALSE}
-plot(cars)
-```
+loadd(wb_summary)
+plot(units::set_units(wb_summary$q, "in"), ylab = "inches", main = "Water Balance", ylim = c(-5,25), col = NA)
+lines(units::set_units(wb_summary$q, "in"), col = "blue", lwd = 2)
+lines(units::set_units(wb_summary$e, "in"), col = "orange", lwd = 2)
+lines(units::set_units(wb_summary$p, "in"), col = "green", lwd = 2)
+lines(units::set_units(wb_summary$x, "in"), col = "black", lwd = 2)
+legend("topleft", legend = c("Precipitation", "Evapotranspiration", "Streamflow", "Residual"), lwd = 2, col = c("green", "orange", "blue", "black"))
+```  
+Data sourced from web services using R packages shown later.
 
 ========================================================
 Application 2: Trends and Plotting  
 
 <small>Exploration and Graphics for RivEr Trends ([EGRET](http://usgs-r.github.io/EGRET/)): A package for analysis of long-term changes in water quality and streamflow.</small>
-```{r trend1, echo = FALSE,   fig.width = 5, fig.height = 5}
+```{r trend1, echo = FALSE,   fig.width = 7, fig.height = 5}
 library(EGRET)
 library(drake)
 loadd(eList)
@@ -263,18 +282,68 @@ legend(x = par()$usr[1], y = par()$usr[3],
 
 Spatial Intersection
 ========================================================
-```{r intersectr}
-library(intersectr)
+class: small-code
+
+The sample code below shows the basic anatomy of an [`intersectr`](https://github.com/USGS-R/intersectr) workflow. In the project source code, we run a similar request for precipitation and evapotranspiration data
+available as a gridded time series.
+```{r intersectr, eval = FALSE}
+# See https://cida.usgs.gov/thredds/dodsC/UofIMETDATA.html for human readable view
+opendap_base_uri <- "https://cida.usgs.gov/thredds/dodsC/UofIMETDATA"
+# See project workflow for full example code for data_source_cells and area_weights.
+data_source_cells <- intersectr::create_cell_geometry(x_coords, y_coords, nc_projection, catchment)
+target_polygons <- sf::st_as_sf(dplyr::select(catchment, ID = featureid))
+area_weights <- intersectr::calculate_area_intersection_weights(data_source_cells, target_polygons)
+intersectr::execute_intersection(nc_file = "https://cida.usgs.gov/thredds/dodsC/UofIMETDATA",
+                                 variable_name = "precipitation_amount",
+                                 intersection_weights = area_weights,
+                                 cell_geometry = data_source_cells,
+                                 x_var = x_coord, y_var = y_coord, t_var = t_coord,
+                                 start_datetime = "2009-10-01 00:00:00", 
+                                 end_datetime = "2010-10-01 00:00:00")
 ```
+
+========================================================
+```{r intersectr_plot, echo = FALSE, fig.width = 6, fig.height = 4}
+loadd(plot_sseb)
+loadd(plot_gridmet)
+loadd(flowline)
+library(dplyr, warn.conflicts = FALSE)
+
+br <- seq(300, 1000, 100)
+plot(plot_gridmet["sum"], main = "Sum of precipitation, (mm)", key.pos = NULL, reset = FALSE, breaks = br)
+plot(sf::st_geometry(flowline), lwd = flowline$streamorde - 0.5, col = "darkblue", add = TRUE)
+
+plot(plot_sseb["sum"], main = "Sum of evapotranspiration, (mm)", key.pos = 3, reset = FALSE, breaks = br)
+plot(sf::st_geometry(flowline), lwd = flowline$streamorde - 0.5, col = "darkblue", add = TRUE)
+```
+<div class = "footer">Precipitation sourced from 
+<a href="http://www.climatologylab.org/gridmet.html" taget = "_blank">gridMet</>
+<br>
+Evapotranspiration sourced from 
+<a href = "https://cida.usgs.gov/thredds/catalog.html?dataset=cida.usgs.gov/ssebopeta/monthly" target = "_blank">SSEBop ETa</a>
+</div>
+***
+Results of intersection shown individually on the left and differenced below.  
+Runoff and Infiltration?
+
+```{r intersectr_plot_real, echo = FALSE, fig.width = 6, fig.height = 5}
+plot_gridmet$diff <- plot_gridmet$sum - plot_sseb$sum
+plot(plot_gridmet["diff"], main = "Difference of Precipitation and Evapotranspiration, (mm)", key.pos = 3, reset = FALSE)
+plot(sf::st_geometry(flowline), lwd = flowline$streamorde - 0.5, col = "darkblue", add = TRUE)
+```
+
+
 
 Water Budget Analysis
 ========================================================
-```{r wb}
-q <- 1
-e <- 0.5
-p <- 1.5
-
-setNames(p - q - e, "Change in Storage")
+```{r wb, echo = FALSE, fig.width = 5, fig.height = 3.5}
+loadd(wb_summary)
+plot(units::set_units(wb_summary$q, "in"), ylab = "in", main = "Runoff")
+plot(units::set_units(wb_summary$p, "in"), ylab = "in", main = "Actual Evapotranspiration")
+plot(units::set_units(wb_summary$p, "in"), ylab = "in", main = "Precipitation")
+plot(units::set_units(wb_summary$x, "in"), ylab = "in", main = "Water Balance")
+balance <- tail(wb_summary$p, 1) - tail(wb_summary$q, 1) - tail(wb_summary$e, 1)
+paste("Water Budget Balance:", round(balance), units(balance))
 ```
 
 
