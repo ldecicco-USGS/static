@@ -98,17 +98,16 @@ Data sourced from web services using R packages shown later.
 ========================================================
 Application 2: Trends and Plotting  
 
-<small>Exploration and Graphics for RivEr Trends ([EGRET](http://usgs-r.github.io/EGRET/)): A package for analysis of long-term changes in water quality and streamflow.</small>
-```{r trend1, echo = FALSE,   fig.width = 7, fig.height = 5}
+```{r trend2, echo = FALSE}
 library(EGRET)
 library(drake)
 loadd(eList)
-plotConcHist(eList)
-
+plot(eList)
 ```
 ***
-```{r trend2, echo = FALSE}
-plot(eList)
+<small>Exploration and Graphics for RivEr Trends ([EGRET](http://usgs-r.github.io/EGRET/)): A package for analysis of long-term changes in water quality and streamflow.</small>
+```{r trend1, echo = FALSE}
+plotConcHist(eList)
 ```
 
 ========================================================
@@ -135,7 +134,9 @@ Resources:
 
 Spatial Data Access 
 ========================================================
+class: small-code
 See nhdplusTools tutorial [here.](https://usgs-r.github.io/nhdplusTools/articles/nhdplusTools.html)
+
 ```{r spatial, eval = FALSE, echo = TRUE}
 library(nhdplusTools)
 site <- list(featureSource = "nwissite", 
@@ -174,8 +175,8 @@ scale.label.cex = 2, arrow.scale = 2)
 
 Observations Data Access 
 ========================================================
-
-See a dataRetrieval tutorial [here.](https://owi.usgs.gov/R/dataRetrieval.html#1)
+class: small-code
+Get USGS and EPA water data. See a dataRetrieval tutorial [here.](https://owi.usgs.gov/R/dataRetrieval.html#1)
 ```{r observations,   eval = FALSE, echo = TRUE}
 library(dataRetrieval)
 flow <- readNWISdv("10128500", "00060")
@@ -347,6 +348,10 @@ paste("Water Budget Balance:", round(balance), units(balance))
 
 Trend Analysis
 ========================================================
+class: small-code
+
+EGRET includes a function to calculate a weighted regrestion on time, discharge, and season (WRTDS).
+
 ```{r egret,  echo = TRUE, eval = FALSE}
 library(EGRET)
 Daily <- readNWISDaily(siteNumber = "10128500")
@@ -363,14 +368,15 @@ eList = mergeReport(INFO = INFO,
 ```
 
 ========================================================
-Here be some cool plot!
-```{r summary, fig.height = 6}
+class: small-code
+This plot is the WRTDS model result of specific conductance concentration over time and discharge.
+```{r summary, fig.height = 6, echo = FALSE}
 plotContours(eList, 1980, 2012, flowDuration = FALSE)
 ```
 ***
-Here be some cool plot!
-```{r summary2, fig.height = 6}
-plotDiffContours(eList, 1980, 2012)
+This plot uses the model to show how June concentration changes over time at specific discharge conditions.
+```{r summary2, fig.height = 6, echo = FALSE}
+plotConcTimeSmooth(eList, 2, 5, 20, centerDate = "06-01", yearStart = 1980, yearEnd = 2010)
 ```
 
 Summary
