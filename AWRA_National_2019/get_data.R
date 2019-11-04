@@ -37,7 +37,8 @@ plan <- drake_plan(
                                       status = TRUE, 
                                       overwrite = TRUE),
   nhd_basin = nhdplusTools::get_nldi_basin(nldi_feature),
-  nhd_fline = sf::st_as_sf(dplyr::filter(sf::read_sf(nhdp, "NHDFlowline_Network"), 
+  all_nhd_fline = sf::read_sf(nhdp, "NHDFlowline_Network"),
+  nhd_fline = sf::st_as_sf(dplyr::filter(all_nhd_fline, 
                                          ftype != "ArtificialPath")),
   nhd_cat = sf::read_sf(nhdp, "CatchmentSP"),
   nhd_area = sf::read_sf(nhdp, "NHDArea"),
@@ -69,6 +70,13 @@ plan <- drake_plan(
     EGRET::modelEstimation() %>% 
     EGRET::blankTime(startBlank = "1991-10-01", 
                      endBlank = "2008-01-01"),
+  site_points = sf::st_as_sf(whatFlow, coords = c("dec_long_va", "dec_lat_va"), 
+                              crs = "+init=epsg:4326"),
+  indexed_sites = nhdplusTools::get_flowline_index(
+    points = sf::st_transform(site_points, ann_prj),
+    flines = sf::st_transform(nhdplusTools::align_nhdplus_names(all_nhd_fline), ann_prj), 
+    search_radius = 100, # stop searching after (m)
+    precision = 10), # Densify node geometry to atleast (m)
   simple_site = list(featureSource = "nwissite", 
                featureID = paste0("USGS-", whatFlow$site_no[1])),
   simple_UT = nhdplusTools::navigate_nldi(simple_site, "upstreamTributaries", ""),
