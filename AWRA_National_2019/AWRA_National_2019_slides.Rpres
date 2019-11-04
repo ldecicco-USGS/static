@@ -119,15 +119,16 @@ left: 30%
 
 **Application 2: Trends and Plotting**  
 
-<small>Exploration and Graphics for RivEr Trends ([EGRET](http://usgs-r.github.io/EGRET/)):  
-A package for analysis of long-term changes in water quality and streamflow.</small>
-***
-```{r trend2, echo = FALSE, fig.width = 10, fig.height = 10}
+```{r trend2, echo = FALSE}
 library(EGRET)
 library(drake)
 loadd(eList)
-# plotConcHist(eList)
 plot(eList)
+```
+***
+<small>Exploration and Graphics for RivEr Trends ([EGRET](http://usgs-r.github.io/EGRET/)): A package for analysis of long-term changes in water quality and streamflow.</small>
+```{r trend1, echo = FALSE}
+plotConcHist(eList)
 ```
 
 ========================================================
@@ -156,7 +157,10 @@ plot(eList)
 
 Spatial Data Access 
 ========================================================
+class: small-code
+
 <a href="https://usgs-r.github.io/nhdplusTools/articles/nhdplusTools.html" target="_blank">**See a nhdplusTools tutorial here.**</a>
+
 ```{r spatial, eval = FALSE, echo = TRUE}
 library(nhdplusTools)
 site <- list(featureSource = "nwissite", 
@@ -195,8 +199,10 @@ title(paste("NHDPlus Upstream of Gage:", simple_UT_site$name), cex.main = 2)
 
 Observations Data Access 
 ========================================================
+class: small-code
 
-<a href="https://owi.usgs.gov/R/dataRetrieval.html#1" target = "_blank">**See a dataRetrieval tutorial here.**</a>
+Get USGS and EPA water data. <a href="https://owi.usgs.gov/R/dataRetrieval.html#1" target = "_blank">**See a dataRetrieval tutorial here.**</a>
+
 ```{r observations,   eval = FALSE, echo = TRUE}
 library(dataRetrieval)
 flow <- readNWISdv("10128500", "00060")
@@ -389,7 +395,7 @@ Trend Analysis with EGRET
 ========================================================
 class: small-code
 
-<small> More info on Exploration and Graphics for RivEr Trends ([EGRET](http://usgs-r.github.io/EGRET/))</small>
+EGRET includes a function to calculate a weighted regrestion on time, discharge, and season (WRTDS).
 
 ```{r egret,  echo = TRUE, eval = FALSE}
 library(EGRET)
@@ -413,15 +419,14 @@ eList = mergeReport(INFO = INFO,
 ========================================================
 class: small-code
 
-**Concentration at any flow through time.**
-```{r summary, fig.height = 6}
-plotContours(eList, 1980, 2012, 
-             flowDuration = FALSE)
+This plot is the WRTDS model result of specific conductance concentration over time and discharge.
+```{r summary, fig.height = 6, echo = FALSE}
+plotContours(eList, 1980, 2012, flowDuration = FALSE)
 ```
 ***
-**How things have changed for a range of flows.**
-```{r summary2, fig.height = 6}
-plotDiffContours(eList, 1980, 2012)
+This plot uses the model to show how June concentration changes over time at specific discharge conditions.
+```{r summary2, fig.height = 6, echo = FALSE}
+plotConcTimeSmooth(eList, 2, 5, 20, centerDate = "06-01", yearStart = 1980, yearEnd = 2010)
 ```
 
 ========================================================
